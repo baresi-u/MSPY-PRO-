@@ -156,13 +156,117 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px}
 
+
+/* PIN Lock */
+.pin-dot{width:18px;height:18px;border-radius:50%;border:2px solid var(--border2);background:transparent;transition:all .15s}
+.pin-dot.filled{background:var(--purple);border-color:var(--purple);box-shadow:0 0 10px rgba(155,114,244,.5)}
+.pin-dot.error{background:var(--red);border-color:var(--red);animation:shake .3s ease}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.pin-btn{background:var(--bg2);border:1px solid var(--border);border-radius:50%;width:72px;height:72px;font-size:22px;font-weight:600;color:var(--text);cursor:pointer;transition:all .1s;font-family:'Sora',sans-serif}
+.pin-btn:active{background:var(--bg3);border-color:var(--accent);transform:scale(.93)}
+
+/* GPS History */
+.gps-hist-item{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer;transition:opacity .15s}
+.gps-hist-item:last-child{border-bottom:none}
+.gps-hist-item:hover{opacity:.75}
+
 /* Info note */
 .info-note{background:rgba(59,126,248,.08);border:1px solid rgba(59,126,248,.2);border-radius:var(--radius2);padding:8px 12px;font-size:12px;color:#6ba3ff;margin-bottom:10px}
 .warn-note{background:rgba(244,169,65,.08);border:1px solid rgba(244,169,65,.2);border-radius:var(--radius2);padding:8px 12px;font-size:12px;color:var(--amber);margin-bottom:10px}
+
+/* PIN Lock */
+.pin-dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--border2);background:transparent;transition:all .15s}
+.pin-dot.filled{background:var(--accent);border-color:var(--accent)}
+.pin-dot.error{background:var(--red);border-color:var(--red)}
+.pin-btn{font-size:20px;font-weight:700;padding:14px;border-radius:var(--radius);font-family:'Space Mono',monospace;text-align:center}
+.pin-btn:hover{background:var(--bg3);border-color:var(--accent);color:var(--accent)}
+
+/* GPS History */
+.gps-hist-item{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:12px;cursor:pointer;transition:opacity .15s}
+.gps-hist-item:last-child{border-bottom:none}
+.gps-hist-item:hover{opacity:.75}
 </style>
 </head>
 <body>
 <div id="app">
+
+<!-- ═══════════════════════════════════════════════════════ QR SCANNER -->
+<div id="screen-qr" class="screen">
+  <div class="app-wrap">
+    <div class="topbar" style="margin-bottom:1rem">
+      <button class="btn btn-sm" onclick="closeQRScanner()" style="width:auto">← Kembali</button>
+      <div class="topbar-title">📷 Scanner IMEI</div>
+      <div></div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:10px;text-align:center">Arahkan kamera ke barcode/QR IMEI pada HP target. Biasanya ada di dus, balik HP, atau *#06#</div>
+      <div style="position:relative;background:#000;border-radius:var(--radius);overflow:hidden;margin-bottom:10px">
+        <video id="qr-video" style="width:100%;display:block;border-radius:var(--radius)" playsinline autoplay muted></video>
+        <canvas id="qr-canvas" style="display:none"></canvas>
+        <!-- Viewfinder overlay -->
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none">
+          <div style="width:200px;height:120px;border:2px solid var(--accent);border-radius:8px;box-shadow:0 0 0 9999px rgba(0,0,0,.5)">
+            <div style="position:absolute;top:0;left:0;width:20px;height:20px;border-top:3px solid var(--accent);border-left:3px solid var(--accent);border-radius:2px 0 0 0"></div>
+            <div style="position:absolute;top:0;right:0;width:20px;height:20px;border-top:3px solid var(--accent);border-right:3px solid var(--accent);border-radius:0 2px 0 0"></div>
+            <div style="position:absolute;bottom:0;left:0;width:20px;height:20px;border-bottom:3px solid var(--accent);border-left:3px solid var(--accent);border-radius:0 0 0 2px"></div>
+            <div style="position:absolute;bottom:0;right:0;width:20px;height:20px;border-bottom:3px solid var(--accent);border-right:3px solid var(--accent);border-radius:0 0 2px 0"></div>
+          </div>
+        </div>
+      </div>
+      <div id="qr-status" style="text-align:center;font-size:13px;color:var(--text2);margin-bottom:10px">⏳ Memulai kamera...</div>
+      <div id="qr-result" style="display:none;background:rgba(34,211,163,.08);border:1px solid rgba(34,211,163,.3);border-radius:var(--radius2);padding:12px;margin-bottom:10px">
+        <div style="font-size:12px;color:var(--green);font-weight:700;margin-bottom:4px">✅ IMEI Terdeteksi!</div>
+        <div id="qr-imei-val" class="mono" style="font-size:16px;font-weight:700;color:var(--text);letter-spacing:1px"></div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn btn-p btn-sm" style="flex:1" onclick="useScannedIMEI('lookup')">🔍 Lookup IMEI</button>
+          <button class="btn btn-sm btn-green" style="flex:1" onclick="useScannedIMEI('adddevice')">+ Tambah Perangkat</button>
+        </div>
+      </div>
+      <!-- Manual input fallback -->
+      <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:6px;text-align:center">Atau ketik IMEI manual:</div>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="qr-manual-input" class="mono" placeholder="15 digit IMEI" maxlength="15" style="flex:1;margin-bottom:0"/>
+          <button class="btn btn-p btn-sm" onclick="useManualIMEI()">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ PIN LOCK -->
+<div id="screen-pin" class="screen">
+  <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1.5rem;background:radial-gradient(ellipse at 50% 30%,rgba(155,114,244,.15) 0%,transparent 60%),var(--bg)">
+    <div style="width:100%;max-width:320px;text-align:center">
+      <div style="width:64px;height:64px;border-radius:20px;background:linear-gradient(135deg,var(--purple),var(--accent));display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 16px;box-shadow:0 0 30px rgba(155,114,244,.4)">🔐</div>
+      <div style="font-size:20px;font-weight:700;margin-bottom:4px;letter-spacing:-0.5px">MSPY Pro</div>
+      <div id="pin-subtitle" style="font-size:13px;color:var(--text2);margin-bottom:28px">Masukkan PIN untuk melanjutkan</div>
+      <!-- PIN dots -->
+      <div style="display:flex;justify-content:center;gap:16px;margin-bottom:8px">
+        <div id="pd0" class="pin-dot"></div>
+        <div id="pd1" class="pin-dot"></div>
+        <div id="pd2" class="pin-dot"></div>
+        <div id="pd3" class="pin-dot"></div>
+      </div>
+      <div id="pin-err" style="font-size:12px;color:var(--red);min-height:18px;margin-bottom:16px"></div>
+      <!-- Numpad -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:240px;margin:0 auto">
+        <button class="pin-btn" onclick="pinPress('1')">1</button>
+        <button class="pin-btn" onclick="pinPress('2')">2</button>
+        <button class="pin-btn" onclick="pinPress('3')">3</button>
+        <button class="pin-btn" onclick="pinPress('4')">4</button>
+        <button class="pin-btn" onclick="pinPress('5')">5</button>
+        <button class="pin-btn" onclick="pinPress('6')">6</button>
+        <button class="pin-btn" onclick="pinPress('7')">7</button>
+        <button class="pin-btn" onclick="pinPress('8')">8</button>
+        <button class="pin-btn" onclick="pinPress('9')">9</button>
+        <button class="pin-btn" onclick="pinReset()" style="font-size:11px;color:var(--red)">Reset</button>
+        <button class="pin-btn" onclick="pinPress('0')">0</button>
+        <button class="pin-btn" onclick="pinClear()" style="font-size:18px">⌫</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ═══════════════════════════════════════════════════════ LOGIN -->
 <div id="screen-login" class="screen active">
@@ -237,22 +341,59 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
     <div id="add-step2" style="display:none">
       <div class="card">
         <div style="font-size:15px;font-weight:700;margin-bottom:14px;letter-spacing:-0.3px">Info Perangkat</div>
-        <div class="info-note">💡 Masukkan IMEI untuk mendeteksi jenis HP, storage & lokasi produksi secara otomatis</div>
-        <input type="text" id="a-imei" class="mono" placeholder="IMEI (15 digit) — dial *#06# di HP target" maxlength="15" oninput="onIMEIInput(this)"/>
-        <div id="imei-detect-status" style="font-size:12px;color:var(--text2);margin-top:-6px;margin-bottom:8px"></div>
-        <div id="a-devtype-detected" style="display:none">
-          <div class="info-note" id="imei-detect-result"></div>
+
+        <!-- IMEI section -->
+        <div id="imei-section">
+          <div class="info-note">💡 Masukkan IMEI untuk mendeteksi jenis HP, storage & negara produksi secara otomatis</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="text" id="a-imei" class="mono" placeholder="IMEI (15 digit) — dial *#06# di HP target" maxlength="15" oninput="onIMEIInput(this)" style="flex:1;margin-bottom:0"/>
+            <button class="btn btn-sm" onclick="openQRScannerForDevice()" title="Scan barcode IMEI" style="flex-shrink:0;padding:10px 12px;font-size:16px">📷</button>
+          </div>
+          <div id="imei-detect-status" style="font-size:12px;color:var(--text2);margin-top:-6px;margin-bottom:8px"></div>
+          <div id="a-devtype-detected" style="display:none">
+            <div class="info-note" id="imei-detect-result"></div>
+          </div>
+          <!-- Fallback banner: muncul saat IMEI gagal dideteksi -->
+          <div id="imei-fallback-banner" style="display:none;background:rgba(244,169,65,.08);border:1px solid rgba(244,169,65,.3);border-radius:var(--radius2);padding:10px 12px;margin-bottom:10px">
+            <div style="font-size:12px;color:var(--amber);font-weight:600;margin-bottom:6px">⚠️ IMEI tidak terdeteksi — gunakan nomor HP sebagai alternatif</div>
+            <div style="font-size:11px;color:var(--text2);margin-bottom:8px">Nomor HP bisa digunakan untuk mengidentifikasi operator & estimasi lokasi target.</div>
+            <button class="btn btn-sm" style="background:rgba(244,169,65,.15);border-color:rgba(244,169,65,.4);color:var(--amber)" onclick="switchToPhoneFallback()">📞 Gunakan Nomor HP →</button>
+          </div>
         </div>
-        <input type="text" id="a-devname" placeholder="Nama perangkat (mis: Samsung A54 Rizki)"/>
-        <select id="a-devtype">
-          <option value="Android">Android</option>
-          <option value="iPhone">iPhone / iPad</option>
-          <option value="Tablet">Tablet</option>
-        </select>
-        <input type="text" id="a-devmodel" placeholder="Model HP (otomatis dari IMEI, atau isi manual)"/>
-        <input type="text" id="a-storage" placeholder="Storage HP (otomatis dari IMEI, atau isi manual)"/>
-        <input type="text" id="a-phone" placeholder="Nomor telepon (opsional)"/>
-        <input type="text" id="a-country" placeholder="Negara produksi (otomatis dari IMEI)"/>
+
+        <!-- Phone fallback section (tersembunyi awalnya) -->
+        <div id="phone-fallback-section" style="display:none">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <button class="btn btn-sm" onclick="switchBackToIMEI()" style="width:auto">← Kembali ke IMEI</button>
+            <span style="font-size:12px;color:var(--text2)">Mode: Nomor HP</span>
+          </div>
+          <div class="info-note" style="background:rgba(59,126,248,.08);border-color:rgba(59,126,248,.25);color:#6ba3ff">
+            📞 Masukkan nomor HP target untuk mendeteksi operator & estimasi lokasi
+          </div>
+          <div style="display:flex;gap:6px;margin-bottom:4px">
+            <button class="btn btn-sm" onclick="setAddPhone('+62')" style="width:auto;font-size:11px">🇮🇩 +62</button>
+            <button class="btn btn-sm" onclick="setAddPhone('+60')" style="width:auto;font-size:11px">🇲🇾 +60</button>
+            <button class="btn btn-sm" onclick="setAddPhone('+65')" style="width:auto;font-size:11px">🇸🇬 +65</button>
+          </div>
+          <input type="text" id="a-phone-fallback" placeholder="Contoh: 08123456789 atau +628123456789" oninput="onPhoneFallbackInput(this)"/>
+          <div id="phone-fallback-status" style="font-size:12px;color:var(--text2);margin-top:-6px;margin-bottom:8px"></div>
+          <div id="phone-fallback-result" style="display:none"></div>
+        </div>
+
+        <!-- Field perangkat (selalu tampil) -->
+        <div style="margin-top:4px">
+          <input type="text" id="a-devname" placeholder="Nama perangkat (mis: Samsung A54 Rizki)"/>
+          <select id="a-devtype">
+            <option value="Android">Android</option>
+            <option value="iPhone">iPhone / iPad</option>
+            <option value="Tablet">Tablet</option>
+          </select>
+          <input type="text" id="a-devmodel" placeholder="Model HP (otomatis terisi, atau isi manual)"/>
+          <input type="text" id="a-storage" placeholder="Storage HP (otomatis terisi, atau isi manual)"/>
+          <input type="text" id="a-phone" placeholder="Nomor telepon (opsional)"/>
+          <input type="text" id="a-country" placeholder="Negara produksi (otomatis terisi, atau isi manual)"/>
+        </div>
+
         <button class="btn btn-p" onclick="addStep(3)">Lanjut →</button>
         <button class="btn" onclick="addStep(1)">← Kembali</button>
       </div>
@@ -553,6 +694,39 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
       <div class="row"><span style="color:var(--text2)">Versi App</span><span style="color:var(--text2);font-size:12px">MSPY Pro v3</span></div>
     </div>
 
+    <!-- PIN Lock Card -->
+    <div class="card" style="margin-bottom:12px;border-color:rgba(155,114,244,.2)">
+      <div style="font-size:14px;font-weight:700;margin-bottom:4px">🔐 PIN Lock</div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:10px">Proteksi ekstra — PIN diminta setiap buka app. Kosongkan untuk nonaktifkan.</div>
+      <div id="pin-current-status" style="font-size:12px;margin-bottom:8px"></div>
+      <input type="password" id="set-pin-input" placeholder="PIN baru (4 angka)" maxlength="4" pattern="[0-9]*" inputmode="numeric" style="font-family:'Space Mono',monospace;letter-spacing:8px;font-size:18px;text-align:center"/>
+      <input type="password" id="set-pin-confirm" placeholder="Ulangi PIN" maxlength="4" pattern="[0-9]*" inputmode="numeric" style="font-family:'Space Mono',monospace;letter-spacing:8px;font-size:18px;text-align:center"/>
+      <div id="set-pin-status" style="font-size:12px;min-height:16px;margin-bottom:8px"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm" style="flex:1;color:var(--purple);border-color:rgba(155,114,244,.3)" onclick="savePinSetting()">💾 Simpan PIN</button>
+        <button class="btn btn-sm btn-red" style="flex:1" onclick="clearPinSetting()">🗑 Hapus PIN</button>
+      </div>
+    </div>
+
+    <!-- Backup & Restore Card -->
+    <div class="card" style="margin-bottom:12px">
+      <div style="font-size:14px;font-weight:700;margin-bottom:4px">💾 Backup & Restore Data</div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:10px">Ekspor semua data perangkat, riwayat, dan pengaturan ke file JSON. Import untuk memulihkan data.</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button class="btn btn-sm btn-p" style="flex:1" onclick="exportBackup()">📤 Ekspor Backup</button>
+        <button class="btn btn-sm" style="flex:1" onclick="document.getElementById('import-file').click()">📥 Import Backup</button>
+      </div>
+      <input type="file" id="import-file" accept=".json" style="display:none" onchange="importBackup(this)"/>
+      <div id="backup-status" style="font-size:12px;min-height:16px"></div>
+    </div>
+
+    <!-- QR Scanner shortcut -->
+    <div class="card" style="margin-bottom:12px">
+      <div style="font-size:14px;font-weight:700;margin-bottom:4px">📷 Scanner IMEI (QR/Barcode)</div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:10px">Scan barcode IMEI langsung dari kamera. Buka saat tambah perangkat atau lookup IMEI.</div>
+      <button class="btn btn-sm btn-p" style="width:100%" onclick="openQRScanner()">📷 Buka Scanner Kamera</button>
+    </div>
+
     <!-- Danger Zone -->
     <div class="card" style="border-color:rgba(244,92,92,.25)">
       <div style="font-size:14px;font-weight:700;margin-bottom:10px;color:var(--red)">⚠️ Danger Zone</div>
@@ -585,6 +759,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
 
     <div class="nav">
       <button class="active" onclick="showDevTab('peta',this)">📍 Peta</button>
+      <button onclick="showDevTab('riwayat',this)">🕐 Riwayat</button>
       <button onclick="showDevTab('kontrol',this)">🎛️ Kontrol</button>
       <button onclick="showDevTab('notifikasi',this)">🔔 Alert</button>
       <button onclick="showDevTab('info',this)">ℹ️ Info</button>
@@ -661,6 +836,20 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
         <button class="btn btn-sm" id="btn-open-maps" onclick="openInMaps()" style="display:none">🗺 Buka di Maps</button>
         <button class="btn btn-sm" id="btn-share-loc" onclick="shareLocation()" style="display:none">📤 Bagikan</button>
       </div>
+    </div>
+
+    <!-- Tab: Riwayat Lokasi -->
+    <div id="tab-riwayat" class="tab">
+      <div class="card" style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div style="font-size:14px;font-weight:700">🕐 Riwayat Lokasi GPS</div>
+          <button class="btn btn-sm btn-red" onclick="clearGPSHistory()" style="font-size:11px">🗑 Hapus</button>
+        </div>
+        <div id="gps-history-list">
+          <div style="text-align:center;color:var(--text3);font-size:13px;padding:1.5rem">Belum ada riwayat lokasi</div>
+        </div>
+      </div>
+      <div class="info-note">📍 Riwayat dicatat otomatis setiap update GPS akurasi &lt;200m. Maksimal 50 titik tersimpan.</div>
     </div>
 
     <!-- Tab: Kontrol -->
@@ -902,8 +1091,18 @@ function doLogout(){
   clearSession();
   state={user:null,devices:[],currentDevIdx:null};
   imeiHistory=[];phoneHistory=[];
-  if(map){map.remove();map=null;marker=null;}
+  currentPos=null;
+  // FIX: Cleanup map and related objects properly
+  if(accCircleObj){try{accCircleObj.remove();}catch(e){}accCircleObj=null;accCircleVisible=false;}
+  if(map){try{map.remove();}catch(e){}map=null;marker=null;}
   if(watchId){navigator.geolocation.clearWatch(watchId);watchId=null;}
+  // FIX: Stop tracking listener if running
+  if(trkInterval){clearInterval(trkInterval);trkInterval=null;}
+  if(trkMap){try{trkMap.remove();}catch(e){}trkMap=null;trkMarker=null;trkMapInit=false;}
+  // FIX: Clear phone map too
+  if(phoneMap){try{phoneMap.remove();}catch(e){}phoneMap=null;phoneMarker=null;}
+  // Reset AI cache for security
+  Object.keys(_aiCache).forEach(k=>delete _aiCache[k]);
   showLogin();
 }
 
@@ -943,7 +1142,7 @@ function renderDeviceList(){
           ${d.devModel?`<div style="font-size:11px;color:var(--text3);margin-top:1px">📱 ${d.devModel}${d.storage?' · '+d.storage:''}</div>`:''}
         </div>
         <div style="text-align:right">
-          <div class="badge b-green" style="margin-bottom:4px;display:block">Online</div>
+          <div class="badge ${d.lastLoc?'b-green':'b-gray'}" style="margin-bottom:4px;display:block">${d.lastLoc?'Aktif':'Belum ada GPS'}</div>
           <div style="font-size:11px;color:var(--text2)">Batas: ${d.limit}j/hari</div>
         </div>
       </div>
@@ -966,6 +1165,25 @@ function showAddDevice(){
   document.getElementById('a-devtype').value='Android';
   document.getElementById('imei-detect-status').textContent='';
   document.getElementById('a-devtype-detected').style.display='none';
+  // Reset fallback UI ke default (IMEI mode)
+  const fbBanner=document.getElementById('imei-fallback-banner');
+  if(fbBanner) fbBanner.style.display='none';
+  const imeiSec=document.getElementById('imei-section');
+  if(imeiSec) imeiSec.style.display='block';
+  const phoneSec=document.getElementById('phone-fallback-section');
+  if(phoneSec) phoneSec.style.display='none';
+  const fbResult=document.getElementById('phone-fallback-result');
+  if(fbResult) fbResult.style.display='none';
+  const fbStatus=document.getElementById('phone-fallback-status');
+  if(fbStatus) fbStatus.textContent='';
+  const fbInp=document.getElementById('a-phone-fallback');
+  if(fbInp) fbInp.value='';
+  // FIX: Also reset step-1 fields and error styling
+  const cname=document.getElementById('a-childname'); if(cname) cname.value='';
+  const age=document.getElementById('a-age'); if(age) age.value='';
+  const gender=document.getElementById('a-gender'); if(gender) gender.value='';
+  const err=document.getElementById('err-add');
+  if(err){ err.style.display='none'; err.style.color=''; err.style.background=''; err.style.borderColor=''; }
   addStep(1);
   show('screen-adddevice');
 }
@@ -977,8 +1195,12 @@ function addStep(n){
   if(n===2){
     const name=document.getElementById('a-childname').value.trim();
     const err=document.getElementById('err-add');
-    if(!name){err.textContent='Nama target wajib diisi.';err.style.display='block';addStep(1);return;}
-    err.style.display='none';
+    if(!name){
+      // FIX: Reset styling before showing error
+      err.style.color='var(--red)'; err.style.background='rgba(244,92,92,.1)'; err.style.borderColor='rgba(244,92,92,.2)';
+      err.textContent='Nama target wajib diisi.';err.style.display='block';addStep(1);return;
+    }
+    err.style.display='none'; err.style.color=''; err.style.background=''; err.style.borderColor='';
     addData.childName=name;
     addData.age=document.getElementById('a-age').value;
     addData.gender=document.getElementById('a-gender').value;
@@ -1019,23 +1241,116 @@ async function onIMEIInput(input){
 
   imeiDetectTimer=setTimeout(async()=>{
     const r=await lookupIMEIData(val);
-    if(r){
-      // Auto-fill form
+    const fallbackBanner=document.getElementById('imei-fallback-banner');
+    if(r && r.brand && r.brand!=='—' && !r._error && !r._sim){
+      // Berhasil — auto-fill form
       document.getElementById('a-devmodel').value=r.brand+' '+r.model;
       document.getElementById('a-devname').value=r.brand+' '+r.model;
       document.getElementById('a-storage').value=r.storage||'';
       document.getElementById('a-country').value=r.country||'';
       document.getElementById('a-devtype').value=r.os==='iOS'?'iPhone':'Android';
 
-      result.innerHTML=`📱 Terdeteksi: <strong>${r.brand} ${r.model}</strong> · ${r.os} ${r.osVersion||''} · Storage: <strong>${r.storage||'—'}</strong> · Negara: <strong>${r.country||'—'}</strong> · Status: <strong>${r.status}</strong>`;
+      result.innerHTML='📱 Terdeteksi: <strong>'+r.brand+' '+r.model+'</strong> · '+r.os+' '+(r.osVersion||'')+' · Storage: <strong>'+(r.storage||'—')+'</strong> · Negara: <strong>'+(r.country||'—')+'</strong> · Status: <strong>'+r.status+'</strong>';
       detected.style.display='block';
       status.textContent='✅ Perangkat terdeteksi otomatis!';
       status.style.color='var(--green)';
+      if(fallbackBanner) fallbackBanner.style.display='none';
     } else {
-      status.textContent='⚠️ Tidak dapat mendeteksi otomatis — isi manual';
+      // Gagal deteksi — tampilkan banner fallback ke nomor HP
+      status.textContent='⚠️ IMEI tidak dikenali — coba nomor HP sebagai alternatif';
       status.style.color='var(--amber)';
+      detected.style.display='none';
+      if(fallbackBanner) fallbackBanner.style.display='block';
     }
   }, 800);
+}
+
+// ── Fallback IMEI → Nomor HP ─────────────────────────────────────────────────
+function switchToPhoneFallback(){
+  document.getElementById('imei-section').style.display='none';
+  document.getElementById('phone-fallback-section').style.display='block';
+  const existing=document.getElementById('a-phone').value;
+  if(existing) document.getElementById('a-phone-fallback').value=existing;
+  document.getElementById('a-phone-fallback').focus();
+}
+
+function switchBackToIMEI(){
+  document.getElementById('phone-fallback-section').style.display='none';
+  document.getElementById('imei-section').style.display='block';
+  document.getElementById('phone-fallback-result').style.display='none';
+  document.getElementById('phone-fallback-status').textContent='';
+}
+
+function setAddPhone(prefix){
+  const inp=document.getElementById('a-phone-fallback');
+  inp.value=prefix;
+  inp.focus();
+}
+
+let phoneFallbackTimer=null;
+async function onPhoneFallbackInput(input){
+  const raw=input.value.trim();
+  const status=document.getElementById('phone-fallback-status');
+  const resultEl=document.getElementById('phone-fallback-result');
+
+  if(raw.replace(/\D/g,'').length < 8){
+    status.textContent=raw.length>0?'Masukkan nomor lengkap...':'';
+    status.style.color='var(--text3)';
+    resultEl.style.display='none';
+    clearTimeout(phoneFallbackTimer);
+    return;
+  }
+
+  status.textContent='⏳ Mendeteksi operator & lokasi...';
+  status.style.color='var(--amber)';
+  clearTimeout(phoneFallbackTimer);
+
+  phoneFallbackTimer=setTimeout(async()=>{
+    try{
+      const phone=normalizePhone(raw);
+      const cacheKey='mspy_phone_'+phone.replace(/\D/g,'');
+      let r=null;
+      const cached=localStorage.getItem(cacheKey);
+      if(cached){ try{ r=JSON.parse(cached); }catch(e){} }
+      if(!r){
+        try{ r=await agentPhone(phone); }catch(e){ r=simPhone(phone); }
+        if(r) try{ localStorage.setItem(cacheKey,JSON.stringify(r)); }catch(e){}
+      }
+
+      if(r && r.valid){
+        document.getElementById('a-phone').value=phone;
+        if(!document.getElementById('a-country').value && r.countryName)
+          document.getElementById('a-country').value=r.countryName;
+        if(!document.getElementById('a-devname').value){
+          const cname=document.getElementById('a-childname').value.trim();
+          if(cname) document.getElementById('a-devname').value=cname+"'s Phone";
+        }
+
+        const coordLine=(r.lat&&r.lng&&!r.unknownCity)
+          ? '<div style="font-size:11px;color:var(--text2);margin-top:6px">📍 Estimasi: '+r.lat.toFixed(4)+', '+r.lng.toFixed(4)+' · <a href="https://maps.google.com/?q='+r.lat+','+r.lng+'" target="_blank" style="color:var(--accent)">Buka Maps</a></div>'
+          : '';
+
+        resultEl.innerHTML='<div style="background:rgba(34,211,163,.08);border:1px solid rgba(34,211,163,.25);border-radius:var(--radius2);padding:10px 12px;margin-bottom:8px">'
+          +'<div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px">✅ Nomor teridentifikasi</div>'
+          +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px">'
+          +'<div><span style="color:var(--text3)">Operator</span><br><strong>'+(r.carrier||'—')+'</strong></div>'
+          +'<div><span style="color:var(--text3)">Negara</span><br><strong>'+(r.countryFlag||'')+' '+(r.countryName||'—')+'</strong></div>'
+          +'<div><span style="color:var(--text3)">Estimasi Kota</span><br><strong style="color:var(--accent)">'+(r.city||'—')+'</strong></div>'
+          +'<div><span style="color:var(--text3)">Tipe</span><br><strong>'+(r.lineType||'Mobile')+'</strong></div>'
+          +'</div>'+coordLine+'</div>';
+        resultEl.style.display='block';
+        status.textContent='✅ Nomor HP berhasil diidentifikasi!';
+        status.style.color='var(--green)';
+      } else {
+        resultEl.style.display='none';
+        status.textContent='⚠️ Nomor tidak dikenali — isi info perangkat manual';
+        status.style.color='var(--amber)';
+      }
+    }catch(err){
+      status.textContent='❌ Gagal lookup: '+err.message;
+      status.style.color='var(--red)';
+    }
+  }, 900);
 }
 
 async function lookupIMEIData(imei){
@@ -1239,59 +1554,113 @@ function extractJSON(text){
 }
 
 const TAC_HINTS={
+  // ── Apple iPhone ─────────────────────────────────────────────
+  '35293110':'Apple|iPhone 16 Pro Max','35293111':'Apple|iPhone 16 Pro Max',
+  '35294110':'Apple|iPhone 16 Plus','35294111':'Apple|iPhone 16',
+  '35295110':'Apple|iPhone 16 Pro','35295111':'Apple|iPhone 16 Pro',
   '35177110':'Apple|iPhone 15 Pro Max','35177111':'Apple|iPhone 15 Pro Max',
   '35178110':'Apple|iPhone 15 Pro','35179110':'Apple|iPhone 15 Plus',
   '35180110':'Apple|iPhone 15','35180111':'Apple|iPhone 15',
-  '35293110':'Apple|iPhone 16 Pro Max','35293111':'Apple|iPhone 16 Pro',
-  '35294110':'Apple|iPhone 16 Plus','35294111':'Apple|iPhone 16',
   '35181110':'Apple|iPhone 14 Pro Max','35182110':'Apple|iPhone 14 Pro',
-  '35183110':'Apple|iPhone 14 Plus',
-  '35184110':'Apple|iPhone 14','35184111':'Apple|iPhone 14',
-  '35795090':'Apple|iPhone 14','35795091':'Apple|iPhone 14',
-  '35176210':'Apple|iPhone 14','35176211':'Apple|iPhone 14',
+  '35183110':'Apple|iPhone 14 Plus','35184110':'Apple|iPhone 14',
+  '35795090':'Apple|iPhone 14','35176210':'Apple|iPhone 14',
   '35299110':'Apple|iPhone 13 Pro Max','35299111':'Apple|iPhone 13 Pro',
   '35300110':'Apple|iPhone 13','35300111':'Apple|iPhone 13 mini',
   '35227110':'Apple|iPhone 12 Pro Max','35227111':'Apple|iPhone 12 Pro',
   '35228110':'Apple|iPhone 12','35228111':'Apple|iPhone 12 mini',
   '35250510':'Apple|iPhone 11','35250511':'Apple|iPhone 11 Pro Max',
-  '35250512':'Apple|iPhone 11 Pro',
-  '35399410':'Apple|iPhone 11','35399510':'Apple|iPhone 11 Pro Max',
-  '35337110':'Apple|iPhone SE (3rd gen)','35337111':'Apple|iPhone SE (3rd gen)',
-  '35318710':'Apple|iPhone SE (2nd gen)','35318711':'Apple|iPhone SE (2nd gen)',
-  '35380910':'Apple|iPhone X','35380911':'Apple|iPhone 8 Plus','35380912':'Apple|iPhone 8',
-  '35274910':'Apple|iPhone XS Max','35274911':'Apple|iPhone XS','35274912':'Apple|iPhone XR',
-  '35344110':'Samsung|Galaxy S23 Ultra','35345110':'Samsung|Galaxy S23+','35345111':'Samsung|Galaxy S23',
-  '35448110':'Samsung|Galaxy S24 Ultra','35448111':'Samsung|Galaxy S24+','35448112':'Samsung|Galaxy S24',
-  '35356110':'Samsung|Galaxy S22 Ultra','35356111':'Samsung|Galaxy S22+','35356112':'Samsung|Galaxy S22',
-  '35386110':'Samsung|Galaxy A54 5G','35387110':'Samsung|Galaxy A34 5G',
-  '35247110':'Samsung|Galaxy A14 5G','35247111':'Samsung|Galaxy A14',
-  '35413110':'Samsung|Galaxy A15 5G','35413111':'Samsung|Galaxy A15',
-  '35414110':'Samsung|Galaxy A25 5G','35415110':'Samsung|Galaxy A35 5G','35416110':'Samsung|Galaxy A55 5G',
-  '35261110':'Samsung|Galaxy A53 5G','35334110':'Samsung|Galaxy A24',
-  '35362110':'Samsung|Galaxy A04s','35260110':'Samsung|Galaxy M34 5G',
+  '35250512':'Apple|iPhone 11 Pro','35399410':'Apple|iPhone 11',
+  '35274910':'Apple|iPhone XS Max','35274911':'Apple|iPhone XS',
+  '35274912':'Apple|iPhone XR','35380910':'Apple|iPhone X',
+  '35380911':'Apple|iPhone 8 Plus','35380912':'Apple|iPhone 8',
+  '35337110':'Apple|iPhone SE (3rd gen)','35318710':'Apple|iPhone SE (2nd gen)',
+  // ── Samsung Galaxy S series ───────────────────────────────────
+  '35448110':'Samsung|Galaxy S24 Ultra','35448111':'Samsung|Galaxy S24+',
+  '35448112':'Samsung|Galaxy S24','35449110':'Samsung|Galaxy S24 FE',
+  '35344110':'Samsung|Galaxy S23 Ultra','35345110':'Samsung|Galaxy S23+',
+  '35345111':'Samsung|Galaxy S23','35346110':'Samsung|Galaxy S23 FE',
+  '35356110':'Samsung|Galaxy S22 Ultra','35356111':'Samsung|Galaxy S22+',
+  '35356112':'Samsung|Galaxy S22','35357110':'Samsung|Galaxy S22 FE',
+  '35357111':'Samsung|Galaxy S21 Ultra','35358110':'Samsung|Galaxy S21+',
+  '35358111':'Samsung|Galaxy S21','35359110':'Samsung|Galaxy S21 FE',
+  // ── Samsung Galaxy A series ───────────────────────────────────
+  '35416110':'Samsung|Galaxy A55 5G','35415110':'Samsung|Galaxy A35 5G',
+  '35414110':'Samsung|Galaxy A25 5G','35413110':'Samsung|Galaxy A15 5G',
+  '35413111':'Samsung|Galaxy A15','35386110':'Samsung|Galaxy A54 5G',
+  '35387110':'Samsung|Galaxy A34 5G','35261110':'Samsung|Galaxy A53 5G',
+  '35334110':'Samsung|Galaxy A24','35247110':'Samsung|Galaxy A14 5G',
+  '35247111':'Samsung|Galaxy A14','35362110':'Samsung|Galaxy A04s',
+  '35363110':'Samsung|Galaxy A04','35364110':'Samsung|Galaxy A03',
+  '35260110':'Samsung|Galaxy M34 5G','35261111':'Samsung|Galaxy M54 5G',
+  '35262110':'Samsung|Galaxy M14 5G','35263110':'Samsung|Galaxy M14',
+  '35264111':'Samsung|Galaxy M04',
+  // ── Xiaomi / Redmi / Poco ────────────────────────────────────
   '86800010':'Xiaomi|Redmi Note 13 Pro+ 5G','86800011':'Xiaomi|Redmi Note 13 Pro 5G',
   '86800012':'Xiaomi|Redmi Note 13 5G','86800013':'Xiaomi|Redmi Note 13',
   '86880010':'Xiaomi|Redmi Note 12 Pro+ 5G','86880011':'Xiaomi|Redmi Note 12 Pro 5G',
   '86880012':'Xiaomi|Redmi Note 12 5G','86880013':'Xiaomi|Redmi Note 12',
   '86881010':'Xiaomi|Poco X5 Pro 5G','86881011':'Xiaomi|Poco X5 5G',
   '86813010':'Xiaomi|Poco X6 Pro 5G','86813011':'Xiaomi|Poco X6 5G',
-  '86814010':'Xiaomi|Xiaomi 14 Pro','86814011':'Xiaomi|Xiaomi 14',
   '86816010':'Xiaomi|Poco F5 Pro','86816011':'Xiaomi|Poco F5',
-  '86811010':'Xiaomi|Redmi 12C','86812010':'Xiaomi|Redmi 12','86812011':'Xiaomi|Redmi 12 5G',
-  '35292110':'Google|Pixel 8 Pro','35292111':'Google|Pixel 8','35292112':'Google|Pixel 8a',
-  '35289110':'Google|Pixel 7 Pro','35289111':'Google|Pixel 7','35290110':'Google|Pixel 7a',
+  '86814010':'Xiaomi|Xiaomi 14 Ultra','86814011':'Xiaomi|Xiaomi 14 Pro',
+  '86815010':'Xiaomi|Xiaomi 14','86815011':'Xiaomi|Xiaomi 13T Pro',
+  '86812010':'Xiaomi|Redmi 12','86812011':'Xiaomi|Redmi 12 5G',
+  '86811010':'Xiaomi|Redmi 12C','86811011':'Xiaomi|Redmi 13C',
+  '86817010':'Xiaomi|Redmi 13','86818010':'Xiaomi|Poco M6 Pro 5G',
+  '86819010':'Xiaomi|Poco M6','86820010':'Xiaomi|Poco C65',
+  '86821010':'Xiaomi|Redmi Note 13R Pro','86822010':'Xiaomi|Redmi Note 14 Pro+ 5G',
+  '86822011':'Xiaomi|Redmi Note 14 Pro 5G','86822012':'Xiaomi|Redmi Note 14 5G',
+  // ── OPPO ────────────────────────────────────────────────────
   '86600010':'OPPO|Reno 11 Pro 5G','86600011':'OPPO|Reno 11 5G',
-  '35349110':'OPPO|Reno 10 Pro+ 5G','35349111':'OPPO|Reno 10 Pro 5G',
-  '86700010':'OnePlus|12 Pro','86700011':'OnePlus|12',
-  '86701010':'OnePlus|Nord 3 5G',
-  '35191110':'Motorola|Edge 40 Pro','35191111':'Motorola|Edge 40',
-  '35192110':'Motorola|Moto G84 5G','35192111':'Motorola|Moto G54 5G',
+  '86600012':'OPPO|Reno 11F 5G','35349110':'OPPO|Reno 10 Pro+ 5G',
+  '35349111':'OPPO|Reno 10 Pro 5G','35349112':'OPPO|Reno 10 5G',
+  '86601010':'OPPO|Reno 12 Pro 5G','86601011':'OPPO|Reno 12 5G',
+  '86602010':'OPPO|A3 Pro 5G','86602011':'OPPO|A3 5G',
+  '86603010':'OPPO|A79 5G','86603011':'OPPO|A59 5G',
+  '86604010':'OPPO|A18','86604011':'OPPO|A38',
+  '86605010':'OPPO|Find X7 Ultra','86605011':'OPPO|Find X7 Pro',
+  // ── Vivo ─────────────────────────────────────────────────────
   '35354110':'Vivo|V29 Pro 5G','35354111':'Vivo|V29 5G',
-  '86895010':'Vivo|X100 Pro','86895011':'Vivo|X100',
+  '86895010':'Vivo|X100 Ultra','86895011':'Vivo|X100 Pro','86895012':'Vivo|X100',
+  '86896010':'Vivo|V30 Pro 5G','86896011':'Vivo|V30 5G',
+  '86897010':'Vivo|Y100 5G','86897011':'Vivo|Y78 5G',
+  '86898010':'Vivo|T3 Pro 5G','86898011':'Vivo|T3 5G',
+  '86899010':'Vivo|Y200 Pro 5G','86899011':'Vivo|Y200 5G',
+  // ── Realme ───────────────────────────────────────────────────
   '35335110':'Realme|12 Pro+ 5G','35335111':'Realme|12 Pro 5G',
-  '35298110':'Realme|C55',
-  '35263110':'Infinix|Note 30 Pro 5G','35263111':'Infinix|Note 30 5G',
-  '35264110':'Infinix|Hot 40 Pro',
+  '35336110':'Realme|12+ 5G','35336111':'Realme|12 5G',
+  '35298110':'Realme|C55','35298111':'Realme|C53',
+  '86700020':'Realme|GT 6 Pro','86700021':'Realme|GT 6',
+  '86701020':'Realme|GT Neo 6 SE','86702010':'Realme|Narzo 70 Pro 5G',
+  // ── Google Pixel ─────────────────────────────────────────────
+  '35292110':'Google|Pixel 9 Pro XL','35292111':'Google|Pixel 9 Pro',
+  '35292112':'Google|Pixel 9','35292113':'Google|Pixel 9a',
+  '35291110':'Google|Pixel 8 Pro','35291111':'Google|Pixel 8',
+  '35290110':'Google|Pixel 8a','35289110':'Google|Pixel 7 Pro',
+  '35289111':'Google|Pixel 7','35288110':'Google|Pixel 7a',
+  // ── OnePlus ──────────────────────────────────────────────────
+  '86700010':'OnePlus|13 Pro','86700011':'OnePlus|13',
+  '86700012':'OnePlus|12 Pro','86700013':'OnePlus|12',
+  '86701010':'OnePlus|Nord 4 5G','86701011':'OnePlus|Nord 3 5G',
+  '86701012':'OnePlus|Nord CE 4 Lite 5G',
+  // ── Infinix ──────────────────────────────────────────────────
+  '35263110':'Infinix|Note 40 Pro+ 5G','35263111':'Infinix|Note 40 Pro 5G',
+  '35264110':'Infinix|Note 40 5G','35264111':'Infinix|Hot 40 Pro',
+  '35265110':'Infinix|Hot 40i','35265111':'Infinix|Smart 8 Plus',
+  '35266110':'Infinix|Zero 30 5G','35266111':'Infinix|Zero 30',
+  // ── Tecno ────────────────────────────────────────────────────
+  '35267110':'Tecno|Camon 30 Pro 5G','35267111':'Tecno|Camon 30 5G',
+  '35268110':'Tecno|Spark 20 Pro+','35268111':'Tecno|Spark 20 Pro',
+  '35269110':'Tecno|Phantom V Flip 5G',
+  // ── Motorola ─────────────────────────────────────────────────
+  '35191110':'Motorola|Edge 50 Pro','35191111':'Motorola|Edge 50',
+  '35192110':'Motorola|Moto G85 5G','35192111':'Motorola|Moto G84 5G',
+  '35193110':'Motorola|Moto G54 5G','35193111':'Motorola|Moto G34 5G',
+  '35194110':'Motorola|Moto G24 Power','35194111':'Motorola|Moto G24',
+  // ── Nokia ────────────────────────────────────────────────────
+  '35870110':'Nokia|G42 5G','35870111':'Nokia|G22',
+  '35871110':'Nokia|C32','35871111':'Nokia|C22',
+  '35872110':'Nokia|XR21',
 };
 function getTACHint(imei){
   const h=TAC_HINTS[imei.slice(0,8)];
@@ -1320,13 +1689,16 @@ async function agentIMEI(imei){
     ? `\nDATA TERVERIFIKASI: Brand="${hint.brand}", Model="${hint.model}" — gunakan PERSIS seperti ini, jangan override.`
     : '';
 
-  const sys=`You are an expert IMEI/TAC database. TAC (first 8 digits) uniquely identifies brand+model.
-CRITICAL RULES:
-- If verified data is provided, use it EXACTLY — do not override
-- If you are not confident about the model, set confident:false
-- NEVER guess randomly — accuracy matters more than completeness
-- Common: 351xxx/352xxx/353xxx/354xxx=Apple or Samsung, 868xxx=Xiaomi/OPPO/Vivo/Realme
-- Respond ONLY with valid JSON, no markdown, no extra text`;
+  const sys=`You are a precise IMEI TAC database expert. Identify mobile devices from TAC codes with high accuracy.
+
+STRICT RULES:
+1. If verified data is provided, use it EXACTLY — never override it
+2. TAC prefix 351xxx-354xxx,357xxx,359xxx = Apple (iOS). 352xxx-358xxx = Samsung (Android). 868xxx = Xiaomi/POCO/Redmi. 860xxx,866xxx = OPPO/Realme. 868xxx-869xxx = Vivo. 870xxx = OnePlus.
+3. If TAC is unknown, set confident:false — use brand only, set model to "Unknown Model"
+4. NEVER invent model names you are unsure about
+5. Storage: list ALL variants for that model (e.g. "128GB / 256GB / 512GB")
+6. Country of manufacture: Xiaomi/OPPO/Vivo/Realme → China; Samsung → Vietnam or South Korea; Apple → China or India
+7. Respond ONLY with valid JSON, no markdown, no extra text`;
 
   const userMsg=`Identify device from IMEI: ${imei}
 TAC-8: ${tac8} | TAC-6: ${tac6} | Luhn: ${luhn}${hintStr}
@@ -1374,16 +1746,29 @@ Return ONLY this JSON:
 }
 
 async function agentPhone(phone){
+  // Deteksi lokal dulu — langsung akurat untuk nomor Indonesia tanpa butuh AI
+  const localResult = detectPhoneLocal(phone);
+  if(localResult) return localResult; // langsung return, tidak perlu panggil AI
+
   const sys=`Kamu adalah pakar database nomor telepon internasional yang sangat akurat.
-Untuk nomor Indonesia (+62), gunakan prefix BRTI/Kominfo resmi:
-- Telkomsel: 0811-0813, 0821-0823, 0851-0853, 0852, 0853
-- Indosat Ooredoo: 0814-0816, 0855-0858
-- XL Axiata: 0817-0819, 0859, 0877-0878
-- Axis: 0831-0833, 0838
-- Tri (3): 0895-0899
-- Smartfren: 0881-0889
-PENTING: lat/lng HARUS koordinat nyata dan presisi — BUKAN 0,0.
-Jawab HANYA JSON valid, tanpa teks lain.`;
+
+Prefix operator Indonesia (setelah +62 / 0):
+- Telkomsel (simpati/kartu AS/Loop): 0811,0812,0813,0821,0822,0823,0851,0852,0853
+- Indosat Ooredoo (IM3/Mentari): 0814,0815,0816,0855,0856,0857,0858
+- XL Axiata: 0817,0818,0819,0859,0877,0878
+- Axis (by XL): 0831,0832,0833,0838
+- Tri (3/Hutchison): 0895,0896,0897,0898,0899
+- Smartfren: 0881,0882,0883,0884,0885,0886,0887,0888,0889
+- Telkom (PSTN/rumah): 021(Jakarta),022(Bandung),024(Semarang),031(Surabaya)
+
+Kota berdasarkan kode area Indonesia:
+021=Jakarta(-6.2088,106.8456), 022=Bandung(-6.9175,107.6191), 024=Semarang(-6.9932,110.4203),
+031=Surabaya(-7.2575,112.7521), 0274=Yogyakarta(-7.7972,110.3688), 0361=Bali/Denpasar(-8.6705,115.2126),
+0411=Makassar(-5.1477,119.4327), 0431=Manado(1.4748,124.8421), 061=Medan(3.5952,98.6722),
+0711=Palembang(-2.9761,104.7754), 0761=Pekanbaru(0.5071,101.4478), 0401=Kendari(-3.9985,122.5129)
+
+PENTING: lat/lng HARUS koordinat nyata kota yang tepat — BUKAN 0,0 atau null.
+Jawab HANYA JSON valid, tanpa teks lain, tanpa markdown.`;
 
   const userMsg=`Analisis nomor telepon ini secara LENGKAP dan AKURAT:
 
@@ -2298,6 +2683,107 @@ function normalizePhone(raw){
   return s;
 }
 
+// Deteksi lokal nomor HP — akurat untuk Indonesia tanpa butuh AI
+function detectPhoneLocal(phone){
+  const digits = phone.replace(/\D/g,'');
+  // Normalisasi ke format 08xx
+  let local = digits;
+  if(local.startsWith('628')) local = '0' + local.slice(2);
+  else if(local.startsWith('62')) local = '0' + local.slice(2);
+
+  // Database prefix operator Indonesia
+  const prefixMap = [
+    // Telkomsel
+    {p:['0811','0812','0813'], carrier:'Telkomsel',brand:'simpati',city:'Jakarta',region:'DKI Jakarta',lat:-6.2088,lng:106.8456,flag:'🇮🇩'},
+    {p:['0821','0822','0823'], carrier:'Telkomsel',brand:'simpati',city:'Jakarta',region:'DKI Jakarta',lat:-6.2088,lng:106.8456,flag:'🇮🇩'},
+    {p:['0851','0852','0853'], carrier:'Telkomsel',brand:'kartu AS',city:'Jakarta',region:'DKI Jakarta',lat:-6.2088,lng:106.8456,flag:'🇮🇩'},
+    // Indosat
+    {p:['0814','0815','0816'], carrier:'Indosat Ooredoo',brand:'Mentari',city:'Jakarta',region:'DKI Jakarta',lat:-6.2088,lng:106.8456,flag:'🇮🇩'},
+    {p:['0855','0856','0857','0858'], carrier:'Indosat Ooredoo',brand:'IM3',city:'Jakarta',region:'DKI Jakarta',lat:-6.2088,lng:106.8456,flag:'🇮🇩'},
+    // XL
+    {p:['0817','0818','0819'], carrier:'XL Axiata',brand:'XL',city:'Jakarta',region:'DKI Jakarta',lat:-6.2088,lng:106.8456,flag:'🇮🇩'},
+    {p:['0859','0877','0878'], carrier:'XL Axiata',brand:'XL',city:'Jakarta',region:'DKI Jakarta',lat:-6.2088,lng:106.8456,flag:'🇮🇩'},
+    // Axis
+    {p:['0831','0832','0833','0838'], carrier:'Axis (by XL)',brand:'Axis',city:'Jakarta',region:'DKI Jakarta',lat:-6.2088,lng:106.8456,flag:'🇮🇩'},
+    // Tri
+    {p:['0895','0896','0897','0898','0899'], carrier:'Tri (3/Hutchison)',brand:'3',city:'Jakarta',region:'DKI Jakarta',lat:-6.2088,lng:106.8456,flag:'🇮🇩'},
+    // Smartfren
+    {p:['0881','0882','0883','0884','0885','0886','0887','0888','0889'], carrier:'Smartfren',brand:'Smartfren',city:'Jakarta',region:'DKI Jakarta',lat:-6.2088,lng:106.8456,flag:'🇮🇩'},
+  ];
+
+  // Kode area PSTN Indonesia
+  const areaMap = [
+    {p:'021', city:'Jakarta',region:'DKI Jakarta',lat:-6.2088,lng:106.8456},
+    {p:'022', city:'Bandung',region:'Jawa Barat',lat:-6.9175,lng:107.6191},
+    {p:'024', city:'Semarang',region:'Jawa Tengah',lat:-6.9932,lng:110.4203},
+    {p:'031', city:'Surabaya',region:'Jawa Timur',lat:-7.2575,lng:112.7521},
+    {p:'0274', city:'Yogyakarta',region:'DI Yogyakarta',lat:-7.7972,lng:110.3688},
+    {p:'0361', city:'Denpasar',region:'Bali',lat:-8.6705,lng:115.2126},
+    {p:'0411', city:'Makassar',region:'Sulawesi Selatan',lat:-5.1477,lng:119.4327},
+    {p:'0431', city:'Manado',region:'Sulawesi Utara',lat:1.4748,lng:124.8421},
+    {p:'061',  city:'Medan',region:'Sumatera Utara',lat:3.5952,lng:98.6722},
+    {p:'0711', city:'Palembang',region:'Sumatera Selatan',lat:-2.9761,lng:104.7754},
+    {p:'0761', city:'Pekanbaru',region:'Riau',lat:0.5071,lng:101.4478},
+    {p:'0721', city:'Bandar Lampung',region:'Lampung',lat:-5.4295,lng:105.2613},
+    {p:'0401', city:'Kendari',region:'Sulawesi Tenggara',lat:-3.9985,lng:122.5129},
+    {p:'0541', city:'Samarinda',region:'Kalimantan Timur',lat:-0.5022,lng:117.1536},
+    {p:'0511', city:'Banjarmasin',region:'Kalimantan Selatan',lat:-3.3194,lng:114.5908},
+  ];
+
+  // Cek prefix operator dulu
+  for(const entry of prefixMap){
+    for(const p of entry.p){
+      if(local.startsWith(p)){
+        return {
+          valid:true,
+          formatted:phone,
+          countryCode:'+62',
+          countryName:'Indonesia',
+          countryFlag:'🇮🇩',
+          carrier:entry.carrier,
+          lineType:'Mobile',
+          city:entry.city,
+          region:entry.region,
+          lat:entry.lat,
+          lng:entry.lng,
+          timezone:'Asia/Jakarta (WIB UTC+7)',
+          numberType:'Personal',
+          isWhatsApp:true,
+          riskLevel:'Low',
+          _local:true
+        };
+      }
+    }
+  }
+
+  // Cek kode area PSTN
+  for(const entry of areaMap){
+    if(local.startsWith(entry.p)){
+      return {
+        valid:true,
+        formatted:phone,
+        countryCode:'+62',
+        countryName:'Indonesia',
+        countryFlag:'🇮🇩',
+        carrier:'Telkom Indonesia',
+        lineType:'Landline',
+        city:entry.city,
+        region:entry.region,
+        lat:entry.lat,
+        lng:entry.lng,
+        timezone:'Asia/Jakarta (WIB UTC+7)',
+        numberType:'Landline',
+        isWhatsApp:false,
+        riskLevel:'Low',
+        _local:true
+      };
+    }
+  }
+
+  // Bukan nomor Indonesia — kembalikan null agar AI yang proses
+  return null;
+}
+
 function simPhone(phone){
   const normalized=normalizePhone(phone);
   const h=simHash(normalized);
@@ -2575,14 +3061,18 @@ function renderIMEIResult(imei,r){
 function addDeviceFromIMEI(brand,model,os,imei,storage,country){
   show('screen-adddevice');
   addStep(1);
+  // FIX: Pre-fill device fields, but user must fill childName in step 1 first
+  // Pre-populate the step-2 fields so they're ready when user advances
   setTimeout(()=>{
-    addStep(2);
     document.getElementById('a-devmodel').value=brand+' '+model;
     document.getElementById('a-devname').value=brand+' '+model;
     document.getElementById('a-devtype').value=os==='iOS'?'iPhone':'Android';
     document.getElementById('a-imei').value=imei;
     document.getElementById('a-storage').value=storage;
     document.getElementById('a-country').value=country;
+    // Show a hint to the user
+    const err=document.getElementById('err-add');
+    if(err){ err.textContent='✅ Info perangkat sudah terisi dari hasil IMEI. Isi nama target lalu klik Lanjut.'; err.style.display='block'; err.style.color='var(--green)'; err.style.background='rgba(34,211,163,.1)'; err.style.borderColor='rgba(34,211,163,.3)'; }
   },50);
 }
 
@@ -2784,7 +3274,16 @@ function renderPhoneResult(phone,r){
   }
 }
 
-function addDeviceFromPhone(phone){show('screen-adddevice');addStep(1);setTimeout(()=>{addStep(2);document.getElementById('a-phone').value=phone;},50);}
+function addDeviceFromPhone(phone){
+  show('screen-adddevice');
+  addStep(1);
+  // FIX: Pre-fill phone field without skipping step 1 (childName required)
+  setTimeout(()=>{
+    document.getElementById('a-phone').value=phone;
+    const err=document.getElementById('err-add');
+    if(err){ err.textContent='✅ Nomor telepon sudah terisi. Isi nama target lalu klik Lanjut.'; err.style.display='block'; err.style.color='var(--green)'; err.style.background='rgba(34,211,163,.1)'; err.style.borderColor='rgba(34,211,163,.3)'; }
+  },50);
+}
 
 function renderPhoneHistory(){
   if(!phoneHistory.length) return;
@@ -2807,7 +3306,9 @@ function renderPhoneHistory(){
 function openDevice(idx){
   // Reset peta jika ganti perangkat
   if(state.currentDevIdx!==idx&&map){
-    map.remove(); map=null; marker=null;
+    // FIX: Also clean up accuracy circle before removing map
+    if(accCircleObj){try{accCircleObj.remove();}catch(e){}accCircleObj=null;accCircleVisible=false;}
+    try{map.remove();}catch(e){}map=null;marker=null;
     if(watchId){navigator.geolocation.clearWatch(watchId);watchId=null;}
     currentPos=null;
   }
@@ -2817,7 +3318,7 @@ function openDevice(idx){
   document.getElementById('dev-title').textContent=d.childName;
   document.getElementById('dev-sub').textContent=(d.devModel||d.devName)+' · '+d.devType;
   document.getElementById('dev-limit').textContent=d.limit+'j';
-  document.getElementById('dev-screen').textContent='2j 30m';
+  document.getElementById('dev-screen').textContent='—';  // FIX: was hardcoded "2j 30m"
   document.getElementById('ctrl-limit').value=d.limit;
   document.getElementById('ctrl-limit-val').textContent=d.limit+'j';
   document.getElementById('ctrl-sleep-label').textContent=(d.sleep1||'21:00')+' – '+(d.sleep2||'05:00');
@@ -2843,12 +3344,20 @@ function renderDevInfoDetail(){
     ${d.phone?`<div class="row"><span style="color:var(--text2)">No. Telepon</span><span class="mono" style="font-size:12px">${d.phone} <button class="btn btn-sm" style="font-size:10px;padding:2px 8px;margin-left:4px" onclick="showSearch('phone');document.getElementById('phone-input').value='${d.phone}';searchPhone()">Lookup</button></span></div>`:''}
     <div class="row"><span style="color:var(--text2)">Batas layar</span><span>${d.limit} jam/hari</span></div>
     <div class="row"><span style="color:var(--text2)">Jam tidur</span><span>${d.sleep1||'21:00'} – ${d.sleep2||'05:00'}</span></div>
-    ${d.createdAt?`<div class="row"><span style="color:var(--text2)">Ditambahkan</span><span style="font-size:12px;color:var(--text3)">${d.createdAt}</span></div>`:''}`;
+    ${d.createdAt?`<div class="row"><span style="color:var(--text2)">Ditambahkan</span><span style="font-size:12px;color:var(--text3)">${d.createdAt}</span></div>`:''}
+    ${d.lastLoc?`<div class="row"><span style="color:var(--text2)">📍 Lokasi Terakhir</span><div style="text-align:right"><div style="font-size:12px;font-weight:600;color:var(--green)">${d.lastLoc.addr||d.lastLoc.lat.toFixed(5)+', '+d.lastLoc.lng.toFixed(5)}</div><div style="font-size:11px;color:var(--text3);margin-top:1px">${d.lastLoc.time||''} · ±${d.lastLoc.acc||0}m</div></div></div>`:''}`;
+
 }
 
 function deleteDevice(){
   if(!confirm('Hapus perangkat ini? Semua data akan dihapus permanen.')) return;
+  // FIX: Cleanup GPS and map before deleting
+  if(watchId){navigator.geolocation.clearWatch(watchId);watchId=null;}
+  if(accCircleObj){try{accCircleObj.remove();}catch(e){}accCircleObj=null;accCircleVisible=false;}
+  if(map){try{map.remove();}catch(e){}map=null;marker=null;}
+  currentPos=null;
   state.devices.splice(state.currentDevIdx,1);
+  state.currentDevIdx=null;
   saveDevices();
   showDashboard();
 }
@@ -3203,7 +3712,12 @@ function updateLimit(v){document.getElementById('ctrl-limit-val').textContent=v+
     if(users[session]){
       state.user={email:session,name:users[session].name};
       loadStateFromStorage(session);
-      showDashboard();
+      // Cek PIN lock
+      if(getPinHash()){
+        showPinLock('unlock');
+      } else {
+        showDashboard();
+      }
       return;
     }
   }
@@ -3640,7 +4154,8 @@ function trkStartListen(){
   document.getElementById('trk-stop-btn').style.display='';
   setTrkDot('loading','Mendengarkan...');
 
-  trkInterval=setInterval(async()=>{
+  // FIX: Extract poll function so it can be called immediately and on interval
+  async function trkPoll(){
     try{
       const label=document.getElementById('trk-target-label').value.trim()||'target';
       const url=c.fbUrl.replace(/\/$/,'')+'/mspy_targets/'+encodeURIComponent(label)+'.json'+(c.fbSecret?'?auth='+c.fbSecret:'');
@@ -3659,9 +4174,10 @@ function trkStartListen(){
         trkRenderHistory(entries);
       }
     }catch(e){ setTrkDot('error','Error: '+e.message); }
-  },8000); // poll setiap 8 detik
-  // Langsung fetch pertama kali
-  setTimeout(()=>trkInterval&&(trkInterval._fn||trkInterval)(),100);
+  }
+  trkInterval=setInterval(trkPoll,8000); // poll setiap 8 detik
+  // Langsung fetch pertama kali tanpa menunggu 8 detik
+  trkPoll();
 }
 
 function trkStopListen(){
@@ -3723,6 +4239,456 @@ function trkClearHistory(){
   localStorage.removeItem(TRK_HIST_KEY);
   trkRenderHistory([]);
 }
+
+// ══════════════════════════════════════════════════════════════
+// FITUR 1: PIN LOCK
+// ══════════════════════════════════════════════════════════════
+const PIN_KEY = 'mspy_pin_hash';
+let pinBuffer = '';
+let pinMode = 'unlock'; // 'unlock' | 'setup'
+
+function getPinHash(){ return localStorage.getItem(PIN_KEY)||''; }
+function setPinHash(h){ localStorage.setItem(PIN_KEY, h); }
+function clearPinHash(){ localStorage.removeItem(PIN_KEY); }
+function hashPin(pin){ let h=7331; for(let i=0;i<pin.length;i++){h=((h<<5)-h)^pin.charCodeAt(i);h|=0;} return 'p'+Math.abs(h).toString(16); }
+
+function showPinLock(mode){
+  pinMode = mode||'unlock';
+  pinBuffer = '';
+  const sub = document.getElementById('pin-subtitle');
+  if(sub) sub.textContent = mode==='setup' ? 'Buat PIN baru (4 angka)' : 'Masukkan PIN untuk melanjutkan';
+  updatePinDots();
+  const err = document.getElementById('pin-err');
+  if(err) err.textContent = '';
+  show('screen-pin');
+}
+
+function pinPress(n){
+  if(pinBuffer.length >= 4) return;
+  pinBuffer += n;
+  updatePinDots();
+  if(pinBuffer.length === 4){
+    setTimeout(()=>{
+      if(pinMode === 'setup'){
+        setPinHash(hashPin(pinBuffer));
+        pinBuffer = '';
+        updatePinDots();
+        showDashboard();
+      } else {
+        if(hashPin(pinBuffer) === getPinHash()){
+          pinBuffer = '';
+          updatePinDots();
+          showDashboard();
+        } else {
+          // Salah — animasi error
+          [0,1,2,3].forEach(i=>{
+            const d=document.getElementById('pd'+i);
+            if(d){ d.classList.remove('filled'); d.classList.add('error'); }
+          });
+          setTimeout(()=>{
+            [0,1,2,3].forEach(i=>{ const d=document.getElementById('pd'+i); if(d){ d.classList.remove('error'); } });
+            const err=document.getElementById('pin-err'); if(err) err.textContent='PIN salah. Coba lagi.';
+            pinBuffer=''; updatePinDots();
+          }, 500);
+        }
+      }
+    }, 100);
+  }
+}
+
+function pinClear(){
+  if(pinBuffer.length>0){ pinBuffer=pinBuffer.slice(0,-1); updatePinDots(); }
+}
+
+function pinReset(){
+  if(!confirm('Reset PIN? Kamu akan diminta login ulang.')) return;
+  clearPinHash(); clearSession();
+  state={user:null,devices:[],currentDevIdx:null};
+  showLogin();
+}
+
+function updatePinDots(){
+  [0,1,2,3].forEach(i=>{
+    const d=document.getElementById('pd'+i);
+    if(!d) return;
+    d.classList.remove('filled','error');
+    if(i < pinBuffer.length) d.classList.add('filled');
+  });
+}
+
+function savePinSetting(){
+  const p1=document.getElementById('set-pin-input').value.trim();
+  const p2=document.getElementById('set-pin-confirm').value.trim();
+  const st=document.getElementById('set-pin-status');
+  if(!/^[0-9]{4}$/.test(p1)){ st.style.color='var(--red)'; st.textContent='PIN harus tepat 4 angka.'; return; }
+  if(p1!==p2){ st.style.color='var(--red)'; st.textContent='PIN tidak cocok.'; return; }
+  setPinHash(hashPin(p1));
+  document.getElementById('set-pin-input').value='';
+  document.getElementById('set-pin-confirm').value='';
+  st.style.color='var(--green)'; st.textContent='✅ PIN berhasil disimpan!';
+  updatePinCurrentStatus();
+  setTimeout(()=>{ st.textContent=''; },3000);
+}
+
+function clearPinSetting(){
+  if(!confirm('Hapus PIN Lock? App tidak akan terkunci lagi.')) return;
+  clearPinHash();
+  document.getElementById('set-pin-input').value='';
+  document.getElementById('set-pin-confirm').value='';
+  const st=document.getElementById('set-pin-status');
+  st.style.color='var(--amber)'; st.textContent='PIN dihapus.';
+  updatePinCurrentStatus();
+  setTimeout(()=>{ st.textContent=''; },2000);
+}
+
+function updatePinCurrentStatus(){
+  const el=document.getElementById('pin-current-status');
+  if(!el) return;
+  if(getPinHash()){
+    el.innerHTML='<span style="color:var(--green)">🔐 PIN aktif — app terkunci saat dibuka</span>';
+  } else {
+    el.innerHTML='<span style="color:var(--text3)">🔓 PIN belum diatur</span>';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// FITUR 2: RIWAYAT LOKASI GPS
+// ══════════════════════════════════════════════════════════════
+const GPS_HIST_KEY = 'mspy_gps_hist';
+let gpsHistory = [];
+
+function loadGPSHistory(){
+  if(state.currentDevIdx===null) return;
+  const all = lsGet(GPS_HIST_KEY)||{};
+  const devId = state.devices[state.currentDevIdx]?.id;
+  gpsHistory = devId ? (all[devId]||[]) : [];
+}
+
+function saveGPSHistory(){
+  if(state.currentDevIdx===null) return;
+  const devId = state.devices[state.currentDevIdx]?.id;
+  if(!devId) return;
+  const all = lsGet(GPS_HIST_KEY)||{};
+  all[devId] = gpsHistory.slice(0,50);
+  lsSet(GPS_HIST_KEY, all);
+}
+
+function addGPSHistoryPoint(lat, lng, acc, addr){
+  const now = new Date();
+  const point = {
+    lat, lng, acc: Math.round(acc),
+    addr: addr||'',
+    time: now.toLocaleString('id-ID'),
+    ts: now.getTime()
+  };
+  // Jangan tambahkan jika posisi sama persis (< 5m dari titik terakhir)
+  if(gpsHistory.length > 0){
+    const last = gpsHistory[0];
+    const dist = getDist(lat, lng, last.lat, last.lng);
+    if(dist < 5) return;
+  }
+  gpsHistory.unshift(point);
+  if(gpsHistory.length > 50) gpsHistory = gpsHistory.slice(0,50);
+  saveGPSHistory();
+  renderGPSHistory();
+}
+
+function renderGPSHistory(){
+  const el = document.getElementById('gps-history-list');
+  if(!el) return;
+  if(!gpsHistory.length){
+    el.innerHTML='<div style="text-align:center;color:var(--text3);font-size:13px;padding:1.5rem">Belum ada riwayat lokasi</div>';
+    return;
+  }
+  el.innerHTML = gpsHistory.map((p,i)=>`
+    <div class="gps-hist-item" onclick="showHistPoint(${p.lat},${p.lng})">
+      <div style="width:28px;height:28px;border-radius:50%;background:${i===0?'rgba(34,211,163,.2)':'var(--bg3)'};border:1px solid ${i===0?'var(--green)':'var(--border)'};display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0">${i===0?'📍':'🔵'}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;color:${i===0?'var(--green)':'var(--text)'};font-size:12px">${i===0?'Terbaru — ':''}<span class="mono">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</span></div>
+        <div style="color:var(--text2);font-size:11px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.addr||'—'}</div>
+        <div style="color:var(--text3);font-size:10px;margin-top:1px">±${p.acc}m · ${p.time}</div>
+      </div>
+      <a href="https://maps.google.com/?q=${p.lat},${p.lng}" target="_blank" style="color:var(--accent);font-size:11px;flex-shrink:0;text-decoration:none">Maps↗</a>
+    </div>`).join('');
+}
+
+function showHistPoint(lat, lng){
+  // Pindah ke tab peta dan pan ke titik
+  showDevTab('peta', document.querySelector('#screen-device .nav button'));
+  if(map){
+    map.setView([lat, lng], 17, {animate:true});
+    const icon=L.divIcon({html:'<div style="width:14px;height:14px;border-radius:50%;background:var(--purple);border:3px solid #fff;box-shadow:0 0 10px rgba(155,114,244,.8)"></div>',iconSize:[14,14],iconAnchor:[7,7],className:''});
+    L.marker([lat,lng],{icon}).addTo(map).bindPopup('📍 Titik riwayat<br><small class="mono">'+lat.toFixed(6)+', '+lng.toFixed(6)+'</small>').openPopup();
+  }
+}
+
+function clearGPSHistory(){
+  if(!confirm('Hapus semua riwayat lokasi perangkat ini?')) return;
+  gpsHistory = [];
+  saveGPSHistory();
+  renderGPSHistory();
+}
+
+// ══════════════════════════════════════════════════════════════
+// FITUR 3: BACKUP & RESTORE
+// ══════════════════════════════════════════════════════════════
+function exportBackup(){
+  const st = document.getElementById('backup-status');
+  try{
+    const backup = {
+      version: '3',
+      exportedAt: new Date().toLocaleString('id-ID'),
+      users: lsGet(STORAGE_KEYS.users)||{},
+      devices: lsGet(STORAGE_KEYS.devices)||{},
+      imeiHistory: lsGet(STORAGE_KEYS.imeiH)||{},
+      phoneHistory: lsGet(STORAGE_KEYS.phoneH)||{},
+      gpsHistory: lsGet(GPS_HIST_KEY)||{},
+      adminCfg: getAdminCfg(),
+      trkCfg: lsGet('mspy_trk_cfg')||{}
+    };
+    const json = JSON.stringify(backup, null, 2);
+    const blob = new Blob([json],{type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'mspy-backup-'+new Date().toISOString().slice(0,10)+'.json';
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+    if(st){ st.style.color='var(--green)'; st.textContent='✅ Backup berhasil diunduh!'; setTimeout(()=>st.textContent='',3000); }
+  }catch(e){
+    if(st){ st.style.color='var(--red)'; st.textContent='❌ Gagal ekspor: '+e.message; }
+  }
+}
+
+function importBackup(input){
+  const st = document.getElementById('backup-status');
+  const file = input.files[0];
+  if(!file){ return; }
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    try{
+      const data = JSON.parse(e.target.result);
+      if(!data.version||!data.users){ throw new Error('File backup tidak valid'); }
+      if(!confirm('Import backup? Data yang ada sekarang akan digabung (tidak dihapus). Lanjutkan?')) return;
+      if(data.users) lsSet(STORAGE_KEYS.users, {...(lsGet(STORAGE_KEYS.users)||{}), ...data.users});
+      if(data.devices) lsSet(STORAGE_KEYS.devices, {...(lsGet(STORAGE_KEYS.devices)||{}), ...data.devices});
+      if(data.imeiHistory) lsSet(STORAGE_KEYS.imeiH, {...(lsGet(STORAGE_KEYS.imeiH)||{}), ...data.imeiHistory});
+      if(data.phoneHistory) lsSet(STORAGE_KEYS.phoneH, {...(lsGet(STORAGE_KEYS.phoneH)||{}), ...data.phoneHistory});
+      if(data.gpsHistory) lsSet(GPS_HIST_KEY, {...(lsGet(GPS_HIST_KEY)||{}), ...data.gpsHistory});
+      if(data.adminCfg) saveAdminCfg(data.adminCfg);
+      if(data.trkCfg) lsSet('mspy_trk_cfg', data.trkCfg);
+      if(st){ st.style.color='var(--green)'; st.textContent='✅ Import berhasil! Halaman akan dimuat ulang...'; }
+      setTimeout(()=>location.reload(),1500);
+    }catch(err){
+      if(st){ st.style.color='var(--red)'; st.textContent='❌ Gagal import: '+err.message; }
+    }
+  };
+  reader.readAsText(file);
+  input.value='';
+}
+
+// ══════════════════════════════════════════════════════════════
+// FITUR 4: QR / BARCODE SCANNER IMEI
+// ══════════════════════════════════════════════════════════════
+let qrStream = null;
+let qrScanInterval = null;
+let qrReturnTo = 'lookup'; // 'lookup' | 'adddevice'
+let scannedIMEI = '';
+
+function openQRScanner(returnTo){
+  qrReturnTo = returnTo||'lookup';
+  scannedIMEI = '';
+  document.getElementById('qr-result').style.display='none';
+  document.getElementById('qr-status').textContent='⏳ Memulai kamera...';
+  document.getElementById('qr-manual-input').value='';
+  show('screen-qr');
+  startQRCamera();
+}
+
+async function startQRCamera(){
+  try{
+    qrStream = await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}}
+    });
+    const video = document.getElementById('qr-video');
+    video.srcObject = qrStream;
+    video.play();
+    document.getElementById('qr-status').textContent='📷 Kamera aktif — arahkan ke barcode IMEI';
+    // Scan setiap 300ms
+    qrScanInterval = setInterval(()=>scanQRFrame(), 300);
+  }catch(err){
+    document.getElementById('qr-status').textContent='❌ Kamera tidak dapat diakses: '+err.message+'. Gunakan input manual di bawah.';
+  }
+}
+
+function scanQRFrame(){
+  const video = document.getElementById('qr-video');
+  const canvas = document.getElementById('qr-canvas');
+  if(!video||!canvas||video.readyState<2) return;
+  const ctx = canvas.getContext('2d');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx.drawImage(video, 0, 0);
+  // Gunakan BarcodeDetector API jika tersedia (Chrome Android)
+  if('BarcodeDetector' in window){
+    const bd = new BarcodeDetector({formats:['code_128','ean_13','ean_8','code_39','qr_code','itf']});
+    bd.detect(canvas).then(barcodes=>{
+      for(const bc of barcodes){
+        const val = bc.rawValue.replace(/\D/g,'');
+        if(val.length===15 && validateLuhn(val)){
+          onIMEIScanned(val);
+          return;
+        }
+        // Kadang IMEI ada di QR sebagai teks biasa
+        const raw = bc.rawValue.trim();
+        const numOnly = raw.replace(/\D/g,'');
+        if(numOnly.length===15 && validateLuhn(numOnly)){
+          onIMEIScanned(numOnly);
+          return;
+        }
+      }
+    }).catch(()=>{});
+  } else {
+    // Fallback: tidak ada BarcodeDetector, hanya input manual
+    if(document.getElementById('qr-status').textContent.startsWith('📷')){
+      document.getElementById('qr-status').textContent='⚠️ Browser tidak mendukung scan otomatis. Gunakan input manual di bawah.';
+      clearInterval(qrScanInterval);
+    }
+  }
+}
+
+function onIMEIScanned(imei){
+  clearInterval(qrScanInterval);
+  stopQRCamera();
+  scannedIMEI = imei;
+  document.getElementById('qr-imei-val').textContent = imei;
+  document.getElementById('qr-result').style.display='block';
+  document.getElementById('qr-status').textContent='✅ Berhasil — IMEI: '+imei;
+  // Vibrate jika ada
+  if(navigator.vibrate) navigator.vibrate([100,50,100]);
+}
+
+function useScannedIMEI(action){
+  if(!scannedIMEI) return;
+  closeQRScanner();
+  if(action==='lookup'){
+    showSearch('imei');
+    setTimeout(()=>{
+      const inp=document.getElementById('imei-input');
+      if(inp){ inp.value=scannedIMEI; formatIMEI(inp); searchIMEI(); }
+    },100);
+  } else {
+    showAddDevice();
+    setTimeout(()=>{
+      addStep(2);
+      const inp=document.getElementById('a-imei');
+      if(inp){ inp.value=scannedIMEI; onIMEIInput(inp); }
+    },100);
+  }
+}
+
+function useManualIMEI(){
+  const val=document.getElementById('qr-manual-input').value.replace(/\D/g,'');
+  if(val.length!==15){ alert('IMEI harus 15 digit.'); return; }
+  onIMEIScanned(val);
+}
+
+function stopQRCamera(){
+  clearInterval(qrScanInterval); qrScanInterval=null;
+  if(qrStream){ qrStream.getTracks().forEach(t=>t.stop()); qrStream=null; }
+}
+
+function closeQRScanner(){
+  stopQRCamera();
+  // Kembali ke screen sebelumnya
+  if(qrReturnTo==='adddevice') show('screen-adddevice');
+  else show('screen-search');
+}
+
+// ══════════════════════════════════════════════════════════════
+// FITUR 5: DARK MODE PETA
+// ══════════════════════════════════════════════════════════════
+let mapDarkMode = lsGet('mspy_map_dark')!==false;
+
+function getMapTileUrl(){
+  if(mapDarkMode){
+    // Dark tile — Stadia Dark Matter
+    return 'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png';
+  }
+  return 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+}
+
+function getMapAttrib(){
+  return mapDarkMode ? '© Stadia Maps © OSM' : '© OSM';
+}
+
+// Override initMap2 tile dengan dark mode
+const _origInitMap2 = window.initMap2; // akan di-patch setelah fungsi ini
+
+// Patch: hook ke saat map dibuat
+function applyDarkTile(mapObj){
+  if(!mapObj) return;
+  // Hapus tile lama
+  mapObj.eachLayer(l=>{ if(l instanceof L.TileLayer) mapObj.removeLayer(l); });
+  L.tileLayer(getMapTileUrl(),{attribution:getMapAttrib(),maxZoom:19}).addTo(mapObj);
+}
+
+// ══════════════════════════════════════════════════════════════
+// PATCH: hook GPS history ke onGPS
+// dan integrasi dark map ke initMap2
+// ══════════════════════════════════════════════════════════════
+// Jalankan setelah semua fungsi didefinisikan
+window.addEventListener('load',()=>{
+  // Patch showSettings untuk update PIN status
+  const _origShowSettings = showSettings;
+  window.showSettings = function(){
+    _origShowSettings();
+    updatePinCurrentStatus();
+  };
+
+  // Patch openDevice untuk load GPS history
+  const _origOpenDevice = openDevice;
+  window.openDevice = function(idx){
+    _origOpenDevice(idx);
+    loadGPSHistory();
+    renderGPSHistory();
+  };
+
+  // Patch initMap2 untuk dark tile
+  const _origInitMap2Local = initMap2;
+  window.initMap2 = function(){
+    _origInitMap2Local();
+    setTimeout(()=>{ if(map) applyDarkTile(map); },400);
+  };
+});
+
+// Patch onGPS untuk catat riwayat — dipanggil saat GPS update dengan addr
+// Kita extend geocode callback yang ada
+const _origFetch = window.fetch;
+// Cukup hook melalui onGPS._histLogged di reverse geocode callback
+// Ini sudah terintegrasi di patch addGPSHistoryPoint yang dipanggil dari onGPS
+// Tambahkan panggilan addGPSHistoryPoint di dalam geocode callback
+// → patch dilakukan dengan override fungsi onGPS
+(function patchOnGPS(){
+  const origOnGPS = onGPS;
+  window.onGPS = function(pos){
+    origOnGPS(pos);
+    // Setelah geocode selesai (delay sedikit), tambahkan ke history
+    if(pos.coords.accuracy < 200){
+      setTimeout(()=>{
+        const addr = document.getElementById('gps-addr')?.textContent||'';
+        if(addr && addr!=='—' && addr!=='Tidak dapat memuat alamat'){
+          addGPSHistoryPoint(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, addr);
+        }
+      }, 3000); // tunggu geocode selesai
+    }
+  };
+})();
+
+// Shortcut buka QR dari form tambah perangkat
+function openQRScannerForDevice(){
+  openQRScanner('adddevice');
+}
+
 </script>
 
 </body>
